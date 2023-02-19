@@ -85,7 +85,7 @@ ggplot(serial_plaintiff, aes(x = reorder(plaint_clean, n), y = n)) +
 # This takes several minutes to run
 debt <- d %>%
   # Extract debt amount
-  mutate(min = str_remove_all(min_desc, "AMOUNT IN DEBT OF |\\$|,") %>%
+  mutate(min = str_remove_all(description, "AMOUNT IN DEBT OF |\\$|,") %>%
            str_remove_all("( PER |Document)(.|\n)*") %>%
            str_squish()) %>%
   # Clean strings to just digits and decimals
@@ -96,11 +96,11 @@ debt <- d %>%
   separate(fees,
            into = paste0("fee", 1:4),
            sep = '", "') %>%
-  rowwise(district, case_number, min_desc) %>%
+  rowwise(district, case_number, description) %>%
   # Convert all fee columns to numeric and sum
   mutate(across(contains("fee"), as.numeric),
          debt_amt = sum(fee1, fee2, fee3, fee4, na.rm = TRUE),
-         late_fee = str_detect(min_desc, "LATE")) %>%
+         late_fee = str_detect(description, "LATE")) %>%
   group_by(district, case_number) %>%
   summarize(debt_amt = sum(debt_amt),
             late_fee = any(late_fee == TRUE))
