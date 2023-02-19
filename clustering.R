@@ -2,28 +2,28 @@ library(tidyverse)
 library(lubridate)
 
 # Read data set
-d <- read_rds("data/ev-data-sample.rds")
+d <- read_rds("ev-data-sample.rds")
 
 # Function to clean plaintiff names
 clean_pl_names <- function(x) {
   str_to_upper({{x}}) |>
-    str_remove_all( " INC| CO(?=($| ))|LLC|LP|LIMITED PARTNERSHIP|QLA|[[:punct:]]|THE | PHASE.{1,30}$|COMPANY|C\\/O.{1,30}| (AT|OF)(?= )| AND|II|DBA.*") %>%
-    str_replace_all("APT([[:alpha:]]|)|APARTMENT([[:alpha:]]|)$|APARTMENT HOMES", "APARTMENTS") %>%
-    str_replace("MHC|MHP|MOBILE HOME.*", "MOBILE HOMES") %>%
-    str_remove_all(" [[:alpha:]]$") %>%
-    str_squish() %>%
-    str_replace(".*HOUSING AUTH.*", "COUNTY HOUSING AUTHORITY") %>%
-    str_replace("MENTAL HEALTH AS.*", "MENTAL HEALTH ASSOCIATION") %>%
-    str_replace("CHAT.*68.*", "CHATEAU 68 APARTMENTS") %>%
-    str_replace(".*AVONDALE.*", "JA AVONDALE") %>%
-    str_remove("DBA") %>%
-    str_remove("(?<=APARTMENTS).*") %>%
-    str_remove("COMPANIES.*") %>%
+    str_remove_all( " INC| CO(?=($| ))|LLC|LP|LIMITED PARTNERSHIP|QLA|[[:punct:]]|THE | PHASE.{1,30}$|COMPANY|C\\/O.{1,30}| (AT|OF)(?= )| AND|II|DBA.*") |>
+    str_replace_all("APT([[:alpha:]]|)|APARTMENT([[:alpha:]]|)$|APARTMENT HOMES", "APARTMENTS") |>
+    str_replace("MHC|MHP|MOBILE HOME.*", "MOBILE HOMES") |>
+    str_remove_all(" [[:alpha:]]$") |>
+    str_squish() |>
+    str_replace(".*HOUSING AUTH.*", "COUNTY HOUSING AUTHORITY") |>
+    str_replace("MENTAL HEALTH AS.*", "MENTAL HEALTH ASSOCIATION") |>
+    str_replace("CHAT.*68.*", "CHATEAU 68 APARTMENTS") |>
+    str_replace(".*AVONDALE.*", "JA AVONDALE") |>
+    str_remove("DBA") |>
+    str_remove("(?<=APARTMENTS).*") |>
+    str_remove("COMPANIES.*") |>
     str_squish()
 }
 
 # Create new variable ('plaint_clean') for cleaned plaintiff name
-plaintiff <- d %>%
+plaintiff <- d |>
   mutate(plaint_clean = clean_pl_names(plaintiff))
 
 # Function to plot most frequently appearing values of column ('col')
@@ -83,25 +83,26 @@ ggplot(serial_plaintiff, aes(x = reorder(plaint_clean, n), y = n)) +
 
 # Extract debt amounts (available only for cases 2019 on)
 # This takes several minutes to run
-debt <- d %>%
+debt <- d |>
+  rename(min_desc = description) |>
   # Extract debt amount
-  mutate(min = str_remove_all(description, "AMOUNT IN DEBT OF |\\$|,") %>%
-           str_remove_all("( PER |Document)(.|\n)*") %>%
-           str_squish()) %>%
+  mutate(min = str_remove_all(min_desc, "AMOUNT IN DEBT OF |\\$|,") |>
+           str_remove_all("( PER |Document)(.|\n)*") |>
+           str_squish()) |>
   # Clean strings to just digits and decimals
-  mutate(fees = str_extract_all(min, "(\\d|\\.)+") %>%
-           as.character() %>%
-           str_remove_all('c\\("|"\\)')) %>%
+  mutate(fees = str_extract_all(min, "(\\d|\\.)+") |>
+           as.character() |>
+           str_remove_all('c\\("|"\\)')) |>
   # Separate listed fees into columns
   separate(fees,
            into = paste0("fee", 1:4),
-           sep = '", "') %>%
-  rowwise(district, case_number, description) %>%
+           sep = '", "') |>
+  rowwise(district, case_number, min_desc) |>
   # Convert all fee columns to numeric and sum
   mutate(across(contains("fee"), as.numeric),
          debt_amt = sum(fee1, fee2, fee3, fee4, na.rm = TRUE),
-         late_fee = str_detect(description, "LATE")) %>%
-  group_by(district, case_number) %>%
+         late_fee = str_detect(min_desc, "LATE")) |>
+  group_by(district, case_number) |>
   summarize(debt_amt = sum(debt_amt),
             late_fee = any(late_fee == TRUE))
 
